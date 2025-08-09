@@ -15,8 +15,9 @@ interface User {
 export function FetchUsers() {
   const { data, error, isLoading, isValidating } = useSWR<User[]>('https://jsonplaceholder.typicode.com/users/', fetcher);
   if (error) return <div>ошибка загрузки</div>
-  {isLoading && '⌛'};
+
   return <>
+    {isLoading && '⌛'}
     {isValidating && '⚡'}
     {data && <ol>
       {data.map(user => <li key={user.id}>{user.name} - {user.email}</li>)}
