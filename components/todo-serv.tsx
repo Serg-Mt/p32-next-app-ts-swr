@@ -3,7 +3,7 @@
 import { MouseEventHandler, useRef } from 'react';
 import useSWR from 'swr';
 import { nanoid } from 'nanoid'
-import toast from 'react-hot-toast';
+import toast, { type ToastOptions } from 'react-hot-toast';
 
 const
   ADD = 'add',
@@ -11,13 +11,18 @@ const
   TOGGLE = 'toggle',
   endpoint = 'http://localhost:3333/todos';
 
+type NonFunctionPropertyNames<T> = {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  [K in keyof T]: T[K] extends Function ? never : K;
+}[keyof T];
+type NonFunctionProperties<T> = Pick<T, NonFunctionPropertyNames<T>>;
 
 class Item {
   id = nanoid(); //Math.random()
   checked = false;
   text = '-default-';
 
-  static from(obj) {
+  static from(obj: NonFunctionProperties<Item>) {
     return Object.assign(new Item, obj);
   }
 
@@ -31,16 +36,34 @@ class Item {
 }
 
 async function fetcher(url: string | URL) {
-  const responce = await fetch(url);
-  return await responce.json()
+  const response = await fetch(url);
+  return await response.json()
 }
+
+const DEBUG_TOAST_OPTIONS: ToastOptions
+  = {
+  icon: '👓',
+  position: 'bottom-right',
+  style: { fontSize: 'xx-small' }
+};
+
 
 
 
 export function ToDoServ() {
   const
     ref = useRef(null),
-    { data, error, isLoading, isValidating, mutate } = useSWR<Item[]>(endpoint, fetcher),
+    { data, error, isLoading, isValidating, mutate } = useSWR<Item[]>(endpoint,
+      (url: Parameters<typeof fetcher>[0]) => {
+        const promise = fetcher(url);
+        toast.promise(promise, { // только для отладки
+          loading: 'fetch',
+          success: 'ok',
+          error: 'ERROR'
+        }, DEBUG_TOAST_OPTIONS)
+        return promise;
+      }
+    ),
     onClick: MouseEventHandler = async (event) => {
       const
         { target } = event,
@@ -55,28 +78,28 @@ export function ToDoServ() {
           const
             text = (ref.current! as HTMLInputElement).value,
             item = new Item(text),
-            optimisticData = [...data, item],
+            optimisticData = [...data!, item],
             updateFn = async () => {
               const
-                promise = fetch(endpoint + '/aaa', {
+                promise = fetch(endpoint + '', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json'
                   },
                   body: JSON.stringify(item)
                 });
-              // toast.promise(promise, {
-              //   loading: 'Adding',
-              //   success: 'Ok',
-              //   error: 'Error add item'
-              // });
+              toast.promise(promise, { // только для отладки
+                loading: 'Adding',
+                success: 'Ok',
+                error: 'Error add item',
+              }, DEBUG_TOAST_OPTIONS);
               const response = await promise;
-              console.log({ response }, await response.json());
+              console.log({ response },);
               if (response.ok) {
-                return optimisticData;
+                return [...data!, Item.from(JSON.parse(await response.text()))]; // поправил
               } else {
-                toast('Error add item');
-                return [...data];
+                toast.error('Error add item'); // важно информировать пользователя OPTIMISTIC UI 
+                return [...data!];
               }
 
 
@@ -87,7 +110,7 @@ export function ToDoServ() {
         case DEL:
           fetch(endpoint + '/' + id,
             { method: 'DELETE' })
-            return;
+          return;
 
         case TOGGLE:
           return;
@@ -97,7 +120,7 @@ export function ToDoServ() {
 
 
   return <fieldset onClick={onClick}>
-    <input ref={ref} /><button data-action={ADD}>add</button>
+    <label><input ref={ref} /><button data-action={ADD}>add</button></label>
     {error && <div className="error">ERROR:</div>}
     {isLoading && '⌛'}
     {isValidating && '⚡'}
@@ -110,8 +133,10 @@ export function ToDoServ() {
 function ToDoItem({ item }: { item: Item }) {
   // console.log('Item render', item.text);
   return <li data-id={item.id}>
-    <input readOnly type="checkbox" checked={item.checked} data-action={TOGGLE} />
-    {item.text}
+    <label>
+      <input readOnly type="checkbox" checked={item.checked} data-action={TOGGLE} />
+      {item.text}
+    </label>
     {item.checked && '✔'}
     <button data-action={DEL} > ❌</button>
   </li>
