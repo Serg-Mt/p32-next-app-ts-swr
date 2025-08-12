@@ -37,18 +37,16 @@ class Item {
 
 async function fetcher(url: string | URL) {
   const response = await fetch(url);
+  if (!response.ok)
+    throw new Error(response.statusText + response.status);
   return await response.json()
 }
 
-const DEBUG_TOAST_OPTIONS: ToastOptions
-  = {
+const DEBUG_TOAST_OPTIONS: ToastOptions = {
   icon: '👓',
   position: 'bottom-right',
   style: { fontSize: 'xx-small' }
 };
-
-
-
 
 export function ToDoServ() {
   const
@@ -72,7 +70,7 @@ export function ToDoServ() {
         return;
       const { action } = (actionTarget as HTMLElement)?.dataset,
         id = ((target as HTMLElement)?.closest('[data-id]') as HTMLElement)?.dataset?.id;
-      console.log({ target, actionTarget, action, id });
+      // console.log({ target, actionTarget, action, id });
       switch (action) {
         case ADD:
           const
@@ -81,28 +79,33 @@ export function ToDoServ() {
             optimisticData = [...data!, item],
             updateFn = async () => {
               const
-                promise = fetch(endpoint + '', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify(item)
-                });
+                generate = async () => {
+                  const
+                    response = await fetch(endpoint + '', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify(item)
+                    });
+                  // console.log({ response },);
+                  if (!response.ok)
+                    throw new Error(response.statusText + response.status);
+                  return await response.json() as NonFunctionProperties<Item>;
+                },
+                promise = generate();
               toast.promise(promise, { // только для отладки
                 loading: 'Adding',
                 success: 'Ok',
                 error: 'Error add item',
               }, DEBUG_TOAST_OPTIONS);
-              const response = await promise;
-              console.log({ response },);
-              if (response.ok) {
-                return [...data!, Item.from(JSON.parse(await response.text()))]; // поправил
-              } else {
+              try {
+                const item = await promise;
+                return [...data!, Item.from(item)]; // поправил
+              } catch {
                 toast.error('Error add item'); // важно информировать пользователя OPTIMISTIC UI 
                 return [...data!];
               }
-
-
             };
           mutate(updateFn(), { optimisticData, revalidate: false });
 
