@@ -5,7 +5,7 @@ const
   pages = [
     { href: '/', title: 'Home' },
     { href: '/swr-demo', title: 'demo SWR' },
-    // { href: '/todo2', title: 'To Do List +delegation' },
+    { href: '/todo', title: 'To Do List + serv' },
     // { href: '/calendar', title: 'Calendar' },
 
   ];
